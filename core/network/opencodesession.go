@@ -69,14 +69,17 @@ func resolveOpencodeSessionValue(ctx *schemas.BifrostContext) string {
 	// x-opencode-session is visible here even though ingress does not otherwise
 	// special-case it.
 	if headers, ok := ctx.Value(schemas.BifrostContextKeyRequestHeaders).(map[string]string); ok {
-		if raw := headers[OpencodeSessionHeader]; raw != "" && isSafeOpencodeSessionValue(raw) {
+		if raw := headers[OpencodeSessionHeader]; raw != "" && strings.TrimSpace(raw) != "" && isSafeOpencodeSessionValue(raw) {
 			return namespaceOpencodeSession(ctx, raw)
 		}
 	}
 	// b) BifrostContextKeySessionID already encodes the shared session identity
 	// rules (x-bf-session-id wins, poison-to-none on an invalid explicit value,
 	// then harness session headers), so reuse it rather than re-deriving.
-	if sessionID, ok := ctx.Value(schemas.BifrostContextKeySessionID).(string); ok && sessionID != "" {
+	// The value is still re-checked with the same charset rule as the client
+	// header: NormalizeSessionID only gates length, so a value carrying control
+	// bytes would otherwise reach the upstream inside the namespaced header.
+	if sessionID, ok := ctx.Value(schemas.BifrostContextKeySessionID).(string); ok && sessionID != "" && isSafeOpencodeSessionValue(sessionID) {
 		return namespaceOpencodeSession(ctx, sessionID)
 	}
 	// c) No signal at all: synthesize a fresh per-request UUID so the request

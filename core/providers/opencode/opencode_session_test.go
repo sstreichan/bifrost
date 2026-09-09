@@ -238,12 +238,13 @@ func TestOpencodeSessionHeaderOnWire(t *testing.T) {
 			// wantHeader is expected verbatim; when wantUUID is set the captured
 			// value must be exactly "<wantHeader>:<UUID>".
 			tests := []struct {
-				name        string
-				ops         []opencodeOp
-				setupCtx    func(t *testing.T) *schemas.BifrostContext
-				wantHeader  string
-				wantHeaders []string // per-op expectation, overrides wantHeader when set
-				wantUUID    bool
+				name             string
+				ops              []opencodeOp
+				setupCtx         func(t *testing.T) *schemas.BifrostContext
+				wantHeader       string
+				wantHeaders      []string // per-op expectation, overrides wantHeader when set
+				wantUUID         bool
+				switchVirtualKey bool // re-set the virtual key to vk-2 for the second op
 			}{
 				{
 					name: "client-sent header forwarded verbatim on every inference op",
@@ -318,7 +319,8 @@ func TestOpencodeSessionHeaderOnWire(t *testing.T) {
 						ctx.SetValue(schemas.BifrostContextKeyVirtualKey, "vk-1")
 						return ctx
 					},
-					wantHeaders: []string{"vk-1:shared-session", "vk-2:shared-session"},
+					wantHeaders:      []string{"vk-1:shared-session", "vk-2:shared-session"},
+					switchVirtualKey: true,
 				},
 			}
 
@@ -335,7 +337,7 @@ func TestOpencodeSessionHeaderOnWire(t *testing.T) {
 						ctx := tt.setupCtx(t)
 						// Alternate the virtual key for the collision case: the
 						// first call uses vk-1, the second vk-2.
-						if i == 1 && strings.HasPrefix(tt.name, "sessions from different virtual keys") {
+						if i == 1 && tt.switchVirtualKey {
 							ctx.SetValue(schemas.BifrostContextKeyVirtualKey, "vk-2")
 						}
 						runOpencodeOp(t, provider, ctx, key, op)

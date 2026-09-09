@@ -9,8 +9,7 @@ import (
 )
 
 // newTestOpencodeCtx builds a BifrostContext carrying the request headers the
-// HTTP transport would have captured. t.Helper() is omitted because the helper
-// never fails the test on its own.
+// HTTP transport would have captured.
 func newTestOpencodeCtx(t *testing.T, requestHeaders map[string]string) *schemas.BifrostContext {
 	t.Helper()
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
@@ -127,6 +126,25 @@ func TestResolveOpencodeSessionFallbackChain(t *testing.T) {
 		got := ResolveOpencodeSession(ctx)
 		if !uuidValueRe.MatchString(got) {
 			t.Errorf("ResolveOpencodeSession() = %q, want synthesized UUID", got)
+		}
+	})
+
+	t.Run("whitespace-only client header is treated as absent", func(t *testing.T) {
+		ctx := newTestOpencodeCtx(t, map[string]string{
+			OpencodeSessionHeader: "   ",
+		})
+		ctx.SetValue(schemas.BifrostContextKeySessionID, "bf-sess-123")
+		if got := ResolveOpencodeSession(ctx); got != "bf-sess-123" {
+			t.Errorf("ResolveOpencodeSession() = %q, want fallback %q", got, "bf-sess-123")
+		}
+	})
+
+	t.Run("session id with control bytes falls back to synthesized UUID", func(t *testing.T) {
+		ctx := newTestOpencodeCtx(t, nil)
+		ctx.SetValue(schemas.BifrostContextKeySessionID, "abc\x01def")
+		got := ResolveOpencodeSession(ctx)
+		if !uuidValueRe.MatchString(got) {
+			t.Errorf("ResolveOpencodeSession() = %q, want synthesized UUID for poisoned session id", got)
 		}
 	})
 }
